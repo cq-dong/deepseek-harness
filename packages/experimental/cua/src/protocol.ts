@@ -20,7 +20,19 @@ const click = { ...pointer, clickCount: z.union([z.literal(1), z.literal(2)]).op
   holdMs: z.number().int().nonnegative().optional()
     .describe('Milliseconds between each mouse press and release; omitted for an ordinary click.') }
 const window = { ...app, windowId }
-const jsonValue = z.json()
+// `z.json()` documents a self reference, so `z.toJSONSchema` emits `$defs` with a recursive
+// `$ref` loop. Providers reject that shape outright: Gemini fails admission with "ref loops are
+// only supported if they include optional or nullable property values ... found at
+// $defs.__schema0.anyOf.5.additionalProperties", which breaks every request carrying this tool.
+// The branches below admit the same values without any recursion.
+const jsonValue = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.unknown()),
+  z.record(z.string(), z.unknown()),
+])
 /** Provider-issued element reference from an accessibility observation. */
 export const elementId = z.string().min(1)
   .describe('Opaque string defined by the platform provider, valid for at least the lifetime of one snapshot.')

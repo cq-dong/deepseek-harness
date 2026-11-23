@@ -68,3 +68,18 @@ it('accepts a parameter-free object schema without a properties dictionary', () 
   replacements.values.set(0, { properties: { method: { const: 'getCapabilities' }, params: { type: 'object' } } })
   expect(nativeProtocol().fields.get('getCapabilities')).toEqual(new Set())
 })
+
+it('emits no recursive $ref loop that providers reject at admission', () => {
+  // Gemini refuses a recursive loop such as `$defs.__schema0.anyOf.5.additionalProperties`,
+  // which made every request carrying this tool fail with 400 INVALID_ARGUMENT.
+  const native = nativeProtocol()
+  expect(native.json).not.toContain('$defs')
+  expect(native.json).not.toContain('$ref')
+  const index = Request.options.findIndex(schema => schema.shape.method.value === 'performAction')
+  const argument = JSON.parse(native.json).oneOf[index].properties.params.properties.argument
+  expect(argument).toEqual({ anyOf: [
+    { type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' },
+    { type: 'array', items: {} },
+    { type: 'object', propertyNames: { type: 'string' }, additionalProperties: {} },
+  ] })
+})
